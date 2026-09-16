@@ -49,7 +49,7 @@ func (r *fakePostRepository) Delete(_ context.Context, _ int64) error {
 
 func TestCreateAppliesDefaults(t *testing.T) {
 	repository := &fakePostRepository{}
-	service := NewPostService(repository)
+	service := NewPostService(repository, &fakeCategoryRepository{})
 
 	post, err := service.Create(context.Background(), dto.CreatePostRequest{
 		AuthorID: 1,
@@ -70,7 +70,7 @@ func TestCreateAppliesDefaults(t *testing.T) {
 
 func TestCreatePublishedPostSetsPublishedAt(t *testing.T) {
 	repository := &fakePostRepository{}
-	service := NewPostService(repository)
+	service := NewPostService(repository, &fakeCategoryRepository{})
 
 	post, err := service.Create(context.Background(), dto.CreatePostRequest{
 		AuthorID: 1,
@@ -92,7 +92,7 @@ func TestListCalculatesPagination(t *testing.T) {
 		listPosts: []model.Post{{ID: 11}},
 		listTotal: 21,
 	}
-	service := NewPostService(repository)
+	service := NewPostService(repository, &fakeCategoryRepository{})
 
 	result, err := service.List(context.Background(), dto.ListPostsQuery{
 		Page:     2,
@@ -111,10 +111,26 @@ func TestListCalculatesPagination(t *testing.T) {
 }
 
 func TestUpdateRejectsEmptyRequest(t *testing.T) {
-	service := NewPostService(&fakePostRepository{})
+	service := NewPostService(&fakePostRepository{}, &fakeCategoryRepository{})
 
 	_, err := service.Update(context.Background(), 1, dto.UpdatePostRequest{})
 	if !errors.Is(err, ErrNoChanges) {
 		t.Fatalf("Update() error = %v, want ErrNoChanges", err)
+	}
+}
+
+func TestCreateRejectsDeletedOrMissingCategory(t *testing.T) {
+	categoryID := int64(99)
+	service := NewPostService(&fakePostRepository{}, &fakeCategoryRepository{})
+
+	_, err := service.Create(context.Background(), dto.CreatePostRequest{
+		AuthorID:   1,
+		CategoryID: &categoryID,
+		Title:      "文章",
+		Slug:       "post",
+		Content:    "正文",
+	})
+	if !errors.Is(err, ErrInvalidReference) {
+		t.Fatalf("Create() error = %v, want ErrInvalidReference", err)
 	}
 }

@@ -1,6 +1,6 @@
 # Gin Blog API
 
-基于 Gin、pgx 和 PostgreSQL 的 Blog 后端项目，当前提供文章的创建、列表、详情、修改和软删除接口。
+基于 Gin、pgx 和 PostgreSQL 的 Blog 后端项目，当前提供用户创建、分类管理，以及文章的创建、列表、详情、修改和软删除接口。
 
 ## 环境
 
@@ -66,6 +66,12 @@ go build -o bin\gin-blog.exe ./cmd/server
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| `POST` | `/api/v1/users` | 创建用户 |
+| `POST` | `/api/v1/categories` | 创建分类 |
+| `GET` | `/api/v1/categories` | 获取分类列表 |
+| `GET` | `/api/v1/categories/:id` | 获取分类详情 |
+| `PATCH` | `/api/v1/categories/:id` | 修改分类 |
+| `DELETE` | `/api/v1/categories/:id` | 软删除分类 |
 | `POST` | `/api/v1/posts` | 创建文章 |
 | `GET` | `/api/v1/posts` | 获取文章列表 |
 | `GET` | `/api/v1/posts/:id` | 获取文章详情 |
@@ -94,7 +100,181 @@ Host: 127.0.0.1:8080
 }
 ```
 
-### 2. 创建文章
+### 2. 创建用户
+
+请求：
+
+```http
+POST /api/v1/users HTTP/1.1
+Host: 127.0.0.1:8080
+Content-Type: application/json
+
+{
+  "username": "hielo19",
+  "email": "hielo19@example.com",
+  "password": "password123",
+  "display_name": "Hielo",
+  "avatar_url": "https://example.com/images/avatar.jpg",
+  "bio": "一名 Blog 作者"
+}
+```
+
+用户名长度为 3 到 50 个字符，只能包含字母、数字和下划线；程序会将用户名和邮箱转换为小写。密码至少为 8 个字符且不能超过 72 字节，入库前使用 bcrypt 哈希，接口不会返回密码或密码哈希。新用户的角色固定为 `author`，状态固定为 `active`。
+
+成功响应：`201 Created`
+
+```json
+{
+  "data": {
+    "id": 1,
+    "username": "hielo19",
+    "email": "hielo19@example.com",
+    "display_name": "Hielo",
+    "avatar_url": "https://example.com/images/avatar.jpg",
+    "bio": "一名 Blog 作者",
+    "role": "author",
+    "status": "active",
+    "last_login_at": null,
+    "created_at": "2026-09-16T08:00:00Z",
+    "updated_at": "2026-09-16T08:00:00Z"
+  }
+}
+```
+
+返回的 `id` 可以作为创建文章时的 `author_id`。
+
+### 3. 创建分类
+
+请求：
+
+```http
+POST /api/v1/categories HTTP/1.1
+Host: 127.0.0.1:8080
+Content-Type: application/json
+
+{
+  "name": "后端开发",
+  "slug": "backend-development",
+  "description": "Go、数据库及服务端开发相关文章",
+  "sort_order": 10
+}
+```
+
+`name` 和 `slug` 必须唯一。`slug` 会转换为小写，只能包含小写字母、数字和连字符；`sort_order` 默认为 `0`，数值越小越靠前。
+
+成功响应：`201 Created`
+
+```json
+{
+  "data": {
+    "id": 1,
+    "name": "后端开发",
+    "slug": "backend-development",
+    "description": "Go、数据库及服务端开发相关文章",
+    "sort_order": 10,
+    "created_at": "2026-09-16T08:00:00Z",
+    "updated_at": "2026-09-16T08:00:00Z"
+  }
+}
+```
+
+### 4. 查看分类列表
+
+请求：
+
+```http
+GET /api/v1/categories HTTP/1.1
+Host: 127.0.0.1:8080
+```
+
+成功响应：`200 OK`
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "name": "后端开发",
+      "slug": "backend-development",
+      "description": "Go、数据库及服务端开发相关文章",
+      "sort_order": 10,
+      "created_at": "2026-09-16T08:00:00Z",
+      "updated_at": "2026-09-16T08:00:00Z"
+    }
+  ]
+}
+```
+
+分类按照 `sort_order` 从小到大排列，排序值相同时按照 `id` 排列；没有分类时 `data` 返回空数组。
+
+### 5. 查看分类详情
+
+请求：
+
+```http
+GET /api/v1/categories/1 HTTP/1.1
+Host: 127.0.0.1:8080
+```
+
+成功响应：`200 OK`
+
+```json
+{
+  "data": {
+    "id": 1,
+    "name": "后端开发",
+    "slug": "backend-development",
+    "description": "Go、数据库及服务端开发相关文章",
+    "sort_order": 10,
+    "created_at": "2026-09-16T08:00:00Z",
+    "updated_at": "2026-09-16T08:00:00Z"
+  }
+}
+```
+
+### 6. 修改分类
+
+修改接口只更新请求中提供的字段：
+
+```http
+PATCH /api/v1/categories/1 HTTP/1.1
+Host: 127.0.0.1:8080
+Content-Type: application/json
+
+{
+  "description": "Go、Gin、PostgreSQL 相关文章",
+  "sort_order": 5
+}
+```
+
+成功响应：`200 OK`
+
+```json
+{
+  "data": {
+    "id": 1,
+    "name": "后端开发",
+    "slug": "backend-development",
+    "description": "Go、Gin、PostgreSQL 相关文章",
+    "sort_order": 5,
+    "created_at": "2026-09-16T08:00:00Z",
+    "updated_at": "2026-09-16T08:20:00Z"
+  }
+}
+```
+
+### 7. 删除分类
+
+请求：
+
+```http
+DELETE /api/v1/categories/1 HTTP/1.1
+Host: 127.0.0.1:8080
+```
+
+成功响应：`204 No Content`，响应体为空。该操作会软删除分类，并在同一个数据库事务中将相关文章的 `category_id` 置为 `null`。
+
+### 8. 创建文章
 
 请求：
 
@@ -142,7 +322,7 @@ Content-Type: application/json
 }
 ```
 
-### 3. 查看文章列表
+### 9. 查看文章列表
 
 请求：
 
@@ -192,7 +372,7 @@ Host: 127.0.0.1:8080
 
 没有匹配文章时，`items` 返回空数组，`total` 和 `total_pages` 返回 `0`。
 
-### 4. 查看文章详情
+### 10. 查看文章详情
 
 请求：
 
@@ -226,7 +406,7 @@ Host: 127.0.0.1:8080
 
 文章不存在或已经被软删除时返回 `404 Not Found`。
 
-### 5. 修改文章
+### 11. 修改文章
 
 修改接口只更新请求中提供的字段：
 
@@ -266,7 +446,7 @@ Content-Type: application/json
 }
 ```
 
-### 6. 删除文章
+### 12. 删除文章
 
 请求：
 
@@ -294,7 +474,12 @@ Host: 127.0.0.1:8080
 | --- | --- | --- |
 | `400` | `INVALID_ARGUMENT` | JSON、分页、状态、作者或分类参数不正确 |
 | `404` | `POST_NOT_FOUND` | 文章不存在或已经软删除 |
+| `404` | `CATEGORY_NOT_FOUND` | 分类不存在或已经软删除 |
 | `409` | `SLUG_ALREADY_USED` | 文章 slug 已被其他文章使用 |
+| `409` | `CATEGORY_NAME_ALREADY_USED` | 分类名称已被使用 |
+| `409` | `CATEGORY_SLUG_ALREADY_USED` | 分类 slug 已被使用 |
+| `409` | `USERNAME_ALREADY_USED` | 用户名已被使用 |
+| `409` | `EMAIL_ALREADY_USED` | 邮箱已被使用 |
 | `500` | `INTERNAL_ERROR` | 未预期的服务器或数据库错误 |
 
 ## 生产提示

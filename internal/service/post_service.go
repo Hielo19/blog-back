@@ -39,11 +39,18 @@ type PostService interface {
 }
 
 type postService struct {
-	repository repository.PostRepository
+	repository         repository.PostRepository
+	categoryRepository repository.CategoryRepository
 }
 
-func NewPostService(repository repository.PostRepository) PostService {
-	return &postService{repository: repository}
+func NewPostService(
+	repository repository.PostRepository,
+	categoryRepository repository.CategoryRepository,
+) PostService {
+	return &postService{
+		repository:         repository,
+		categoryRepository: categoryRepository,
+	}
 }
 
 func (s *postService) Create(
@@ -68,6 +75,9 @@ func (s *postService) Create(
 	}
 	request.Summary = trimOptional(request.Summary)
 	request.CoverImageURL = trimOptional(request.CoverImageURL)
+	if err := s.validateCategory(ctx, request.CategoryID); err != nil {
+		return nil, err
+	}
 
 	post := &model.Post{
 		AuthorID:      request.AuthorID,
@@ -150,6 +160,9 @@ func (s *postService) Update(
 			request.PublishedAt = &now
 		}
 	}
+	if err := s.validateCategory(ctx, request.CategoryID); err != nil {
+		return nil, err
+	}
 
 	post, err := s.repository.Update(ctx, id, model.PostChanges{
 		AuthorID:      request.AuthorID,
@@ -172,6 +185,19 @@ func (s *postService) Update(
 
 func (s *postService) Delete(ctx context.Context, id int64) error {
 	return s.repository.Delete(ctx, id)
+}
+
+func (s *postService) validateCategory(ctx context.Context, categoryID *int64) error {
+	if categoryID == nil {
+		return nil
+	}
+	if _, err := s.categoryRepository.GetByID(ctx, *categoryID); err != nil {
+		if errors.Is(err, repository.ErrCategoryNotFound) {
+			return ErrInvalidReference
+		}
+		return err
+	}
+	return nil
 }
 
 func trimOptional(value *string) *string {

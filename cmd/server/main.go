@@ -40,13 +40,19 @@ func run() error {
 	defer db.Close()
 	log.Print("connected to PostgreSQL")
 
+	userRepository := repository.NewPostgresUserRepository(db)
+	userService := service.NewUserService(userRepository)
+	userHandler := handler.NewUserHandler(userService)
+	categoryRepository := repository.NewPostgresCategoryRepository(db)
+	categoryService := service.NewCategoryService(categoryRepository)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
 	postRepository := repository.NewPostgresPostRepository(db)
-	postService := service.NewPostService(postRepository)
+	postService := service.NewPostService(postRepository, categoryRepository)
 	postHandler := handler.NewPostHandler(postService)
 
 	server := &http.Server{
 		Addr:              configuration.Address(),
-		Handler:           router.New(postHandler),
+		Handler:           router.New(postHandler, userHandler, categoryHandler),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
